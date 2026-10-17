@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>go-redis Playground</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --red: #f85149;
+    --yellow: #d29922;
+    --mono: "SF Mono", "Cascadia Code", "Fira Code", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    min-height: 100vh;
+  }
+  header {
+    padding: 20px 32px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  header h1 { font-size: 20px; font-weight: 600; }
+  header h1 span { color: var(--accent); }
+  .status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--muted);
+    margin-left: auto;
+  }
+  .status .dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--yellow);
+  }
+  .status .dot.ok { background: var(--green); }
+  .status .dot.err { background: var(--red); }
+
+  main { max-width: 1200px; margin: 0 auto; padding: 28px 32px 80px; }
+
+  section { margin-bottom: 36px; }
+  section > h2 {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    margin-bottom: 16px;
+  }
+
+  /* custom command box */
+  .custom-box {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+  }
+  .custom-row { display: flex; gap: 10px; align-items: flex-start; }
+  .custom-row input,
+  .custom-row textarea {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 14px;
+    padding: 11px 14px;
+    outline: none;
+    resize: vertical;
+  }
+  .custom-row input:focus,
+  .custom-row textarea:focus { border-color: var(--accent); }
+  .custom-row button, .run-btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 11px 22px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .custom-row button:hover, .run-btn:hover { filter: brightness(1.15); }
+  .custom-row button:disabled { opacity: 0.5; cursor: default; }
+
+  .response {
+    margin-top: 14px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 13px 16px;
+    font-family: var(--mono);
+    font-size: 13px;
+    min-height: 44px;
+    display: none;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  .response.show { display: block; }
+  .response.ok { color: var(--green); }
+  .response.err { color: var(--red); }
+
+  .hint { font-size: 12px; color: var(--muted); margin-top: 10px; }
+
+  /* command grid */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 14px;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .card-head code {
+    font-family: var(--mono);
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .card-head .tag {
+    font-size: 10px;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 3px 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .card p { font-size: 13px; color: var(--muted); line-height: 1.5; }
+  .card .example {
+    font-family: var(--mono);
+    font-size: 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 11px;
+    color: var(--text);
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .card .example:hover { border-color: var(--accent); }
+  .card .actions { display: flex; gap: 8px; }
+  .card .run-btn { flex: 1; padding: 8px 0; font-size: 13px; }
+  .card .result {
+    font-family: var(--mono);
+    font-size: 12px;
+    border-radius: 6px;
+    padding: 8px 11px;
+    display: none;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  .card .result.show { display: block; }
+  .card .result.ok { background: rgba(63,185,80,0.08); color: var(--green); border: 1px solid rgba(63,185,80,0.3); }
+  .card .result.err { background: rgba(248,81,73,0.08); color: var(--red); border: 1px solid rgba(248,81,73,0.3); }
+
+  .spinner {
+    display: inline-block;
+    width: 13px; height: 13px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1><span>go-redis</span> Playground</h1>
+  <div class="status">
+    <div class="dot" id="dot"></div>
+    <span id="statusText">checking...</span>
+  </div>
+</header>
+
+<main>
+
+  <section>
+  <h2>Custom Command</h2>
+  <div class="custom-box">
+    <div class="custom-row">
+      <textarea id="customInput" placeholder="e.g.  SET mykey hello EX 10&#10;or for transaction:&#10;MULTI&#10;SET k1 v1&#10;INCR counter&#10;EXEC" spellcheck="false" rows="7"></textarea>
+      <button id="customBtn" onclick="runCustom()">Run</button>
+    </div>
+    <div class="response" id="customResult"></div>
+    <div class="hint">Type any Redis command. For transactions, write MULTI, then commands, then EXEC on separate lines. Arguments are split on spaces — quote values that contain spaces.</div>
+  </div>
+</section>
+
+<section>
+  <h2>All Commands</h2>
+  <div class="grid" id="grid"></div>
+</section>
+
+</main>
+
+<script>
+const COMMANDS = [
+  { name: "PING",     tag: "server",  desc: "Check that the server is alive. Returns PONG, or echoes the given argument.", example: "PING" },
+  { name: "SET",      tag: "string",  desc: "Store a key-value pair. Optionally set an expiry with EX (seconds).",        example: "SET mykey hello EX 10" },
+  { name: "GET",      tag: "string",  desc: "Retrieve the value of a key. Returns nil if the key does not exist.",       example: "GET mykey" },
+  { name: "TTL",      tag: "key",     desc: "Get the remaining time-to-live of a key in seconds. -1 if no expiry, -2 if missing.", example: "TTL mykey" },
+  { name: "DEL",      tag: "key",     desc: "Delete one or more keys. Returns the number of keys removed.",              example: "DEL mykey" },
+  { name: "EXPIRE",   tag: "key",     desc: "Set a TTL on an existing key. Returns 1 on success, 0 if the key is missing.", example: "EXPIRE mykey 30" },
+  { name: "INCR",     tag: "string",  desc: "Atomically increment an integer-valued key by 1. Initializes to 0 if missing.", example: "INCR counter" },
+  { name: "INFO",     tag: "server",  desc: "Return keyspace statistics (key counts, etc.).",                           example: "INFO" },
+  { name: "BGREWRITEAOF", tag: "persist", desc: "Serialize all keys to the AOF file for persistence / crash recovery.",  example: "BGREWRITEAOF" },
+  { name: "LRU",      tag: "evict",   desc: "Trigger a manual allkeys-LRU eviction pass.",                              example: "LRU" },
+  { name: "SLEEP",    tag: "debug",   desc: "Block the server for N seconds. Debug / testing utility.",                 example: "SLEEP 2" },
+  { name: "MULTI/EXEC", tag: "transaction", desc: "Execute commands in a transaction. Write MULTI, then commands, then EXEC on new lines.", example: "MULTI\nSET k1 v1\nINCR counter\nEXEC" },
+  { name: "DISCARD",  tag: "transaction", desc: "Discard all queued commands in a transaction and end the transaction.", example: "DISCARD" },
+];
+
+async function api(command) {
+  const res = await fetch("/api/command", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ command }),
+  });
+  return res.json();
+}
+
+function fmt(v) {
+  if (v === null || v === undefined) return "(nil)";
+  if (Array.isArray(v)) return v.length ? v.map(x => (x === null ? "(nil)" : x)).join("\n") : "(empty array)";
+  return String(v);
+}
+
+// ---------- custom command ----------
+
+async function runCustom() {
+  const input = document.getElementById("customInput");
+  const btn = document.getElementById("customBtn");
+  const out = document.getElementById("customResult");
+  const cmd = input.value.trim();
+  if (!cmd) return;
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+  out.className = "response show";
+  out.textContent = "running...";
+
+  try {
+    const data = await api(cmd);
+    if (data.error) {
+      out.className = "response show err";
+      out.textContent = "ERR " + data.error;
+    } else {
+      out.className = "response show ok";
+      out.textContent = fmt(data.result);
+    }
+  } catch (e) {
+    out.className = "response show err";
+    out.textContent = "Request failed: " + e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Run";
+  }
+}
+
+// ---------- command cards ----------
+
+function buildCards() {
+  const grid = document.getElementById("grid");
+  grid.innerHTML = "";
+  for (const c of COMMANDS) {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <div class="card-head">
+        <code>${c.name}</code>
+        <span class="tag">${c.tag}</span>
+      </div>
+      <p>${c.desc}</p>
+      <div class="example" title="Click to load into custom box" onclick="loadExample('${c.example.replace(/'/g, "\\'")}')">${c.example}</div>
+      <div class="actions">
+        <button class="run-btn" data-cmd="${c.example}">Run example</button>
+      </div>
+      <div class="result"></div>
+    `;
+    card.querySelector(".run-btn").addEventListener("click", (e) => runCard(e.target, c.example));
+    grid.appendChild(card);
+  }
+}
+
+function loadExample(cmd) {
+  const input = document.getElementById("customInput");
+  input.value = cmd;
+  input.focus();
+}
+
+async function runCard(btn, cmd) {
+  const result = btn.closest(".card").querySelector(".result");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+  result.className = "result";
+
+  try {
+    const data = await api(cmd);
+    result.classList.add("show");
+    if (data.error) {
+      result.classList.add("err");
+      result.textContent = "ERR " + data.error;
+    } else {
+      result.classList.add("ok");
+      result.textContent = fmt(data.result);
+    }
+  } catch (e) {
+    result.classList.add("show", "err");
+    result.textContent = "Request failed: " + e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Run example";
+  }
+}
+
+// ---------- health ----------
+
+async function checkHealth() {
+  const dot = document.getElementById("dot");
+  const text = document.getElementById("statusText");
+  try {
+    const res = await fetch("/api/health");
+    const data = await res.json();
+    if (data.status === "ok") {
+      dot.className = "dot ok";
+      text.textContent = "connected";
+    } else {
+      dot.className = "dot err";
+      text.textContent = "unreachable";
+    }
+  } catch {
+    dot.className = "dot err";
+    text.textContent = "bridge down";
+  }
+}
+
+buildCards();
+checkHealth();
+setInterval(checkHealth, 10000);
+</script>
+</body>
+</html>
