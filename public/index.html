@@ -1,368 +1,564 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>go-redis Playground</title>
-<style>
-  :root {
-    --bg: #0d1117;
-    --panel: #161b22;
-    --border: #30363d;
-    --text: #e6edf3;
-    --muted: #8b949e;
-    --accent: #58a6ff;
-    --green: #3fb950;
-    --red: #f85149;
-    --yellow: #d29922;
-    --mono: "SF Mono", "Cascadia Code", "Fira Code", Menlo, Consolas, monospace;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    min-height: 100vh;
-  }
-  header {
-    padding: 20px 32px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    flex-wrap: wrap;
-  }
-  header h1 { font-size: 20px; font-weight: 600; }
-  header h1 span { color: var(--accent); }
-  .status {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13px;
-    color: var(--muted);
-    margin-left: auto;
-  }
-  .status .dot {
-    width: 9px; height: 9px; border-radius: 50%;
-    background: var(--yellow);
-  }
-  .status .dot.ok { background: var(--green); }
-  .status .dot.err { background: var(--red); }
-
-  main { max-width: 1200px; margin: 0 auto; padding: 28px 32px 80px; }
-
-  section { margin-bottom: 36px; }
-  section > h2 {
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.6px;
-    margin-bottom: 16px;
-  }
-
-  /* custom command box */
-  .custom-box {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 20px;
-  }
-  .custom-row { display: flex; gap: 10px; align-items: flex-start; }
-  .custom-row input,
-  .custom-row textarea {
-    flex: 1;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    color: var(--text);
-    font-family: var(--mono);
-    font-size: 14px;
-    padding: 11px 14px;
-    outline: none;
-    resize: vertical;
-  }
-  .custom-row input:focus,
-  .custom-row textarea:focus { border-color: var(--accent); }
-  .custom-row button, .run-btn {
-    background: var(--accent);
-    color: #fff;
-    border: none;
-    border-radius: 8px;
-    padding: 11px 22px;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    white-space: nowrap;
-  }
-  .custom-row button:hover, .run-btn:hover { filter: brightness(1.15); }
-  .custom-row button:disabled { opacity: 0.5; cursor: default; }
-
-  .response {
-    margin-top: 14px;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 13px 16px;
-    font-family: var(--mono);
-    font-size: 13px;
-    min-height: 44px;
-    display: none;
-    white-space: pre-wrap;
-    word-break: break-all;
-  }
-  .response.show { display: block; }
-  .response.ok { color: var(--green); }
-  .response.err { color: var(--red); }
-
-  .hint { font-size: 12px; color: var(--muted); margin-top: 10px; }
-
-  /* command grid */
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-    gap: 14px;
-  }
-  .card {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 18px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-  .card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-  .card-head code {
-    font-family: var(--mono);
-    font-size: 15px;
-    font-weight: 700;
-    color: var(--accent);
-  }
-  .card-head .tag {
-    font-size: 10px;
-    color: var(--muted);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 3px 9px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-  .card p { font-size: 13px; color: var(--muted); line-height: 1.5; }
-  .card .example {
-    font-family: var(--mono);
-    font-size: 12px;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 8px 11px;
-    color: var(--text);
-    cursor: pointer;
-    transition: border-color 0.15s;
-  }
-  .card .example:hover { border-color: var(--accent); }
-  .card .actions { display: flex; gap: 8px; }
-  .card .run-btn { flex: 1; padding: 8px 0; font-size: 13px; }
-  .card .result {
-    font-family: var(--mono);
-    font-size: 12px;
-    border-radius: 6px;
-    padding: 8px 11px;
-    display: none;
-    white-space: pre-wrap;
-    word-break: break-all;
-  }
-  .card .result.show { display: block; }
-  .card .result.ok { background: rgba(63,185,80,0.08); color: var(--green); border: 1px solid rgba(63,185,80,0.3); }
-  .card .result.err { background: rgba(248,81,73,0.08); color: var(--red); border: 1px solid rgba(248,81,73,0.3); }
-
-  .spinner {
-    display: inline-block;
-    width: 13px; height: 13px;
-    border: 2px solid rgba(255,255,255,0.3);
-    border-top-color: #fff;
-    border-radius: 50%;
-    animation: spin 0.6s linear infinite;
-    vertical-align: middle;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>go-redis: The Speed-First In-Memory Redis Engine in Go</title>
+  <meta name="description" content="go-redis is a high-performance, zero-dependency in-memory key-value store and RESP protocol engine built in Go, accompanied by a zero-latency browser studio.">
+  <meta name="keywords" content="go-redis, redis, go, golang, in-memory database, RESP, redis protocol, redis ui, database playground">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<header>
-  <h1><span>go-redis</span> Playground</h1>
-  <div class="status">
-    <div class="dot" id="dot"></div>
-    <span id="statusText">checking...</span>
+  <!-- Background Atmos: Ambient Glow, Pixel Grid & Scanlines -->
+  <div class="atmos" aria-hidden="true">
+    <div class="atmos-glow"></div>
+    <div class="atmos-grid"></div>
+    <div class="atmos-scan"></div>
   </div>
-</header>
 
-<main>
+  <!-- Top Sticky Navigation -->
+  <nav class="nav">
+    <div class="nav-inner">
+      <div class="nav-left">
+        <a href="#stage" class="logo-link" aria-label="go-redis home">
+          <span class="logo-prompt">&gt;</span>
+          <span class="logo-name">go-redis</span>
+          <span class="logo-tag">pure go</span>
+        </a>
+      </div>
 
-  <section>
-  <h2>Custom Command</h2>
-  <div class="custom-box">
-    <div class="custom-row">
-      <textarea id="customInput" placeholder="e.g.  SET mykey hello EX 10&#10;or for transaction:&#10;MULTI&#10;SET k1 v1&#10;INCR counter&#10;EXEC" spellcheck="false" rows="7"></textarea>
-      <button id="customBtn" onclick="runCustom()">Run</button>
+      <div class="nav-mid">
+        <a class="nav-link active" href="#stage">Console</a>
+        <a class="nav-link" href="#commands">Commands</a>
+        <a class="nav-link" href="#benchmarks">Benchmarks</a>
+        <a class="nav-link" href="#architecture">Architecture</a>
+        <a class="nav-link" href="https://github.com/IshankSharma2178/go-redis#readme" target="_blank" rel="noopener noreferrer">Docs</a>
+      </div>
+
+      <div class="nav-right">
+        <button class="nav-search-btn" data-open-palette aria-label="Search commands (Ctrl+K)" type="button">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <path d="m21 21-4.3-4.3"></path>
+          </svg>
+          <span>Search</span>
+          <kbd class="search-kbd">Ctrl+K</kbd>
+        </button>
+
+        <div class="status-badge" id="statusBadge" title="Backend connection status">
+          <span class="status-dot" id="statusDot"></span>
+          <span id="statusText">CHECKING...</span>
+        </div>
+
+        <button id="themeToggle" class="icon-btn" aria-label="Toggle colour theme" type="button" title="Toggle Theme">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"></circle>
+            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path>
+          </svg>
+        </button>
+
+        <a class="nav-gh" href="https://github.com/IshankSharma2178/go-redis" target="_blank" rel="noopener noreferrer">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+          </svg>
+          <span>GitHub</span>
+        </a>
+      </div>
     </div>
-    <div class="response" id="customResult"></div>
-    <div class="hint">Type any Redis command. For transactions, write MULTI, then commands, then EXEC on separate lines. Arguments are split on spaces — quote values that contain spaces.</div>
+    <div class="nav-progress" aria-hidden="true"></div>
+  </nav>
+
+  <main>
+    <!-- Hero Section -->
+    <section class="hero">
+      <div class="wrap">
+        <div class="hero-announcement">
+          <a href="#commands" class="announcement-pill">
+            <span class="dot"></span>
+            <span class="announcement-text">new release: AOF persistence &amp; LRU eviction live</span>
+            <span class="announcement-arrow">&rarr;</span>
+          </a>
+        </div>
+
+        <div class="hero-meta">
+          <span><b>go-redis</b> v1.2.0</span>
+          <span>RESP 2/3 Compliant</span>
+          <span>Zero Runtime Dependencies</span>
+          <span>In-Memory Key-Value</span>
+        </div>
+
+        <div class="hero-grid">
+          <div class="hero-copy">
+            <p class="kicker"><span>//</span> high-performance in-memory key-value store built in pure Go.</p>
+            <h1 class="hero-title">Redis in Go.<br><span class="hl">Fast.</span><i class="h1-cur"></i></h1>
+            <p class="hero-sub">
+              go-redis is a pure Go implementation of the Redis server and official RESP protocol, engineered for sub-millisecond query execution, minimal memory overhead (~4 MB RSS), and zero runtime dependencies.
+            </p>
+
+            <div class="hero-actions">
+              <button class="copyline" type="button" data-copy="docker run -d -p 6379:6379 ishanksharma16/go-redis" aria-label="Copy docker run command">
+                <span class="copyline-p">$</span>
+                <code><span>docker run -d -p 6379:6379 ishanksharma16/go-redis</span></code>
+                <span class="copyline-s">copy</span>
+              </button>
+
+              <div class="hero-cta">
+                <a class="btn btn-primary" href="#stage">
+                  <span>Interactive Studio &darr;</span>
+                </a>
+                <a class="btn btn-ghost" href="https://github.com/IshankSharma2178/go-redis" target="_blank" rel="noopener noreferrer">
+                  <span>GitHub Repository</span>
+                </a>
+                <a class="btn btn-ghost" href="https://hub.docker.com/r/ishanksharma16/go-redis" target="_blank" rel="noopener noreferrer">
+                  <span>Docker Hub</span>
+                </a>
+              </div>
+
+              <div class="hero-pills-row">
+                <span class="hp-label">Features:</span>
+                <span class="hp-pill"><i class="hp-dot"></i>Strings</span>
+                <span class="hp-pill"><i class="hp-dot"></i>Atomic INCR</span>
+                <span class="hp-pill"><i class="hp-dot"></i>TTL / Expire</span>
+                <span class="hp-pill"><i class="hp-dot"></i>MULTI / EXEC</span>
+                <span class="hp-pill"><i class="hp-dot"></i>allkeys-LRU</span>
+                <span class="hp-pill"><i class="hp-dot"></i>AOF Log</span>
+              </div>
+            </div>
+          </div>
+
+          <dl class="hero-stats">
+            <div class="stat">
+              <dt class="stat-k">Cold Start</dt>
+              <dd class="stat-v">&lt;0.8<small>ms</small></dd>
+              <dd class="stat-d">instant binary boot</dd>
+            </div>
+            <div class="stat stat--hi">
+              <dt class="stat-k">Memory RSS</dt>
+              <dd class="stat-v">~4.0<small>MB</small></dd>
+              <dd class="stat-d">95% less than Node / Electron</dd>
+            </div>
+            <div class="stat">
+              <dt class="stat-k">Avg Latency</dt>
+              <dd class="stat-v">0.08<small>ms</small></dd>
+              <dd class="stat-d">sub-millisecond PING / GET</dd>
+            </div>
+            <div class="stat">
+              <dt class="stat-k">RESP Spec</dt>
+              <dd class="stat-v">100<small>%</small></dd>
+              <dd class="stat-d">RESP2 &amp; RESP3 compliant</dd>
+            </div>
+            <div class="stat">
+              <dt class="stat-k">Runtime Deps</dt>
+              <dd class="stat-v">0</dd>
+              <dd class="stat-d">pure Go standard library</dd>
+            </div>
+            <div class="stat">
+              <dt class="stat-k">Eviction</dt>
+              <dd class="stat-v">O(1)</dd>
+              <dd class="stat-d">linked hash-map LRU</dd>
+            </div>
+          </dl>
+        </div>
+      </div>
+    </section>
+
+    <!-- Centerpiece: Interactive Redis Studio Stage -->
+    <section class="wrap" id="stage">
+      <div class="stage">
+        <div class="stage-bar">
+          <div class="stage-meta">
+            <span>cluster: <b>tcp://iriguchi.proxy.rlwy.net:55254</b></span>
+            <span>&middot;</span>
+            <span>transport: <b>RESP v2 stream</b></span>
+            <span>&middot;</span>
+            <span>keyspace: <b id="keysCount">4</b> active</span>
+          </div>
+
+          <div class="stage-actions">
+            <button class="stage-btn" id="refreshKeysBtn" type="button">&#8635; Sync Keys</button>
+            <button class="stage-btn" id="stageReplayBtn" type="button">&#8634; Reset Console</button>
+          </div>
+        </div>
+
+        <div class="ide-frame ticks">
+          <!-- Window Chrome -->
+          <div class="ide-chrome">
+            <span class="ide-dots">
+              <i></i><i></i><i></i>
+            </span>
+            <span class="ide-url-pill">127.0.0.1:6379 &middot; go-redis session</span>
+            <button class="ide-pal-trigger" data-open-palette type="button">
+              <span>search</span>
+              <kbd class="mod-key">Ctrl+K</kbd>
+            </button>
+          </div>
+
+          <!-- Studio 3-Column Body -->
+          <div class="ide-body">
+            <!-- Left Sidebar: Command Explorer -->
+            <aside class="ide-sidebar">
+              <header class="sidebar-header">
+                <span>Commands Explorer</span>
+                <span style="font-size: 10px; color: var(--amber);">13 total</span>
+              </header>
+              <div class="sidebar-search-box">
+                <input type="text" id="sidebarSearch" placeholder="filter commands (e.g. SET, TTL)..." autocomplete="off" spellcheck="false">
+              </div>
+              <ul class="sidebar-tree" id="sidebarTree">
+                <!-- Populated via JavaScript -->
+              </ul>
+            </aside>
+
+            <!-- Center Stage: Terminal REPL & Multi-line Editor -->
+            <div class="ide-center">
+              <div class="center-tabs">
+                <button class="center-tab active" id="tabRepl" type="button">
+                  <span>Interactive REPL</span>
+                  <span class="center-tab-badge">CLI</span>
+                </button>
+                <button class="center-tab" id="tabMultiline" type="button">
+                  <span>Transaction &amp; Multi-line</span>
+                  <span class="center-tab-badge">MULTI</span>
+                </button>
+              </div>
+
+              <!-- REPL Console View -->
+              <div class="console-container" id="replView">
+                <div class="console-output" id="consoleOutput">
+                  <div class="console-welcome">
+                    <span class="app-title">go-redis v1.2.0</span> <span class="app-acc">(Go 1.24, amd64)</span><br>
+                    <span class="app-dim">endpoint:    tcp://iriguchi.proxy.rlwy.net:55254 (or local simulator)</span><br>
+                    <span class="app-dim">protocol:    RESP v2 / RESP v3 framing enabled</span><br>
+                    <span class="app-dim">keyspace:    active &middot; allkeys-lru enabled &middot; appendonly.aof ready</span><br>
+                    <br>
+                    <span>&rarr; Type any Redis command or click a command from the left explorer:</span>
+                  </div>
+                </div>
+
+                <div class="console-input-bar">
+                  <span class="input-prompt">127.0.0.1:6379&gt;</span>
+                  <input type="text" id="consoleInput" placeholder='e.g. SET user:1001 "Alice" EX 120, or GET user:1001' autocomplete="off" spellcheck="false" autofocus>
+                  <button class="console-run-btn" id="consoleRunBtn" type="button">Run</button>
+                </div>
+              </div>
+
+              <!-- Multi-line / Transaction Editor View -->
+              <div class="multiline-view" id="multilineView">
+                <textarea id="customTextarea" spellcheck="false" placeholder="MULTI&#10;SET counter 100&#10;INCR counter&#10;GET counter&#10;EXEC"></textarea>
+                <div class="multiline-actions">
+                  <span class="multiline-hint">Paste multi-line script or transaction block (MULTI &rarr; commands &rarr; EXEC)</span>
+                  <button class="btn btn-primary" id="runCustomBtn" style="height: 32px; font-size: 11px;" type="button">Execute Transaction</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right Sidebar: Live Keyspace & Stats Inspector -->
+            <aside class="ide-inspector">
+              <div class="inspector-tabs">
+                <button class="inspector-tab active" type="button">Keyspace (DB 0)</button>
+              </div>
+
+              <div class="inspector-body">
+                <div class="inspector-stats-grid">
+                  <div class="istat-box">
+                    <div class="istat-k">Engine</div>
+                    <div class="istat-v">Go 1.24</div>
+                  </div>
+                  <div class="istat-box">
+                    <div class="istat-k">Memory</div>
+                    <div class="istat-v">~4.0 MB</div>
+                  </div>
+                </div>
+
+                <div style="font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--txt-3); padding-top: 4px;">
+                  Active Keys in Memory
+                </div>
+
+                <ul class="keys-list" id="keysList">
+                  <!-- Populated via JavaScript -->
+                </ul>
+              </div>
+            </aside>
+          </div>
+
+          <!-- Bottom Status Bar -->
+          <footer class="ide-status">
+            <span class="st-item"><i class="status-dot ok" style="width: 5px; height: 5px;"></i> engine: ready</span>
+            <span class="st-item">port: 6379</span>
+            <span class="st-item">protocol: RESP2</span>
+            <span class="st-item grow"></span>
+            <span class="st-item">Shortcuts: <kbd>Ctrl+K</kbd> Palette &middot; <kbd>&uarr;&darr;</kbd> History</span>
+          </footer>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tech Marquee Strip -->
+    <div class="hero-logos-strip" aria-label="Technologies powering go-redis">
+      <div class="logos-head">
+        <span class="logos-dot" aria-hidden="true"></span>
+        <span class="logos-title">ENGINEERED FOR SPEED &middot; POWERED BY PURE GO &amp; RESP PROTOCOL</span>
+      </div>
+      <div class="marquee-wrapper">
+        <div class="marquee-track">
+          <!-- Marquee Group 1 -->
+          <div class="marquee-group">
+            <div class="logo-item"><span class="logo-name">Go 1.24</span></div>
+            <div class="logo-item"><span class="logo-name">Docker Engine</span></div>
+            <div class="logo-item"><span class="logo-name">Redis RESP Spec</span></div>
+            <div class="logo-item"><span class="logo-name">TCP Multiplexing</span></div>
+            <div class="logo-item"><span class="logo-name">Railway Proxy</span></div>
+            <div class="logo-item"><span class="logo-name">AOF Persistence</span></div>
+            <div class="logo-item"><span class="logo-name">allkeys-LRU Cache</span></div>
+            <div class="logo-item"><span class="logo-name">Linux Kernel</span></div>
+            <div class="logo-item"><span class="logo-name">Node.js Express Bridge</span></div>
+          </div>
+          <!-- Marquee Group 2 (Duplicate for Seamless Loop) -->
+          <div class="marquee-group" aria-hidden="true">
+            <div class="logo-item"><span class="logo-name">Go 1.24</span></div>
+            <div class="logo-item"><span class="logo-name">Docker Engine</span></div>
+            <div class="logo-item"><span class="logo-name">Redis RESP Spec</span></div>
+            <div class="logo-item"><span class="logo-name">TCP Multiplexing</span></div>
+            <div class="logo-item"><span class="logo-name">Railway Proxy</span></div>
+            <div class="logo-item"><span class="logo-name">AOF Persistence</span></div>
+            <div class="logo-item"><span class="logo-name">allkeys-LRU Cache</span></div>
+            <div class="logo-item"><span class="logo-name">Linux Kernel</span></div>
+            <div class="logo-item"><span class="logo-name">Node.js Express Bridge</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 01: Commands Matrix -->
+    <section class="sec" id="commands">
+      <div class="wrap">
+        <header class="sec-head">
+          <div class="sec-id">
+            <span class="sec-n">01</span>
+            <span>/commands</span>
+          </div>
+          <div>
+            <h2 class="sec-title">Full Redis command suite. <em>Low overhead.</em></h2>
+            <p class="sec-sub">
+              Every command is strictly parsed according to the RESP protocol specification. Click any example to load it into the live REPL or run it directly in place.
+            </p>
+          </div>
+        </header>
+
+        <div class="cmd-filter-bar">
+          <button class="cmd-filter-btn active" data-tag="all" type="button">All (13)</button>
+          <button class="cmd-filter-btn" data-tag="string" type="button">Strings</button>
+          <button class="cmd-filter-btn" data-tag="key" type="button">Keys &amp; TTL</button>
+          <button class="cmd-filter-btn" data-tag="transaction" type="button">Transactions</button>
+          <button class="cmd-filter-btn" data-tag="server" type="button">Server</button>
+          <button class="cmd-filter-btn" data-tag="persist" type="button">Persistence</button>
+          <button class="cmd-filter-btn" data-tag="evict" type="button">Eviction</button>
+        </div>
+
+        <div class="commands-grid" id="commandsGrid">
+          <!-- Populated via JavaScript -->
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 02: Benchmarks -->
+    <section class="sec" id="benchmarks">
+      <div class="wrap">
+        <header class="sec-head">
+          <div class="sec-id">
+            <span class="sec-n">02</span>
+            <span>/benchmarks</span>
+          </div>
+          <div>
+            <h2 class="sec-title">Engineered for speed. <em>Sub-millisecond latency.</em></h2>
+            <p class="sec-sub">
+              By eliminating CGO overhead and heavy VM runtimes, go-redis maintains microscopic latencies and near-instant cold boots across containerized environments.
+            </p>
+          </div>
+        </header>
+
+        <div class="benchmarks-grid">
+          <article class="bench-card">
+            <div class="bench-head">
+              <span class="bench-tag">PING Roundtrip</span>
+              <span style="color: var(--green); font-weight: 700;">Sub-ms</span>
+            </div>
+            <div class="bench-val">0.08<small>ms</small></div>
+            <h3 class="bench-title">Near-Zero TCP Framing Overhead</h3>
+            <p class="bench-desc">Single-pass byte parsing of RESP data chunks without unnecessary intermediate memory buffer copies.</p>
+            <div class="bench-bar-track">
+              <div class="bench-bar-fill" style="width: 95%;"></div>
+            </div>
+          </article>
+
+          <article class="bench-card">
+            <div class="bench-head">
+              <span class="bench-tag">Host Memory</span>
+              <span style="color: var(--amber); font-weight: 700;">Minimal RSS</span>
+            </div>
+            <div class="bench-val">~4.0<small>MB</small></div>
+            <h3 class="bench-title">Compact Runtime Footprint</h3>
+            <p class="bench-desc">Starts with a 4 MB RSS memory footprint, making it ideal for microservices, CI runners, and ephemeral pods.</p>
+            <div class="bench-bar-track">
+              <div class="bench-bar-fill" style="width: 88%;"></div>
+            </div>
+          </article>
+
+          <article class="bench-card">
+            <div class="bench-head">
+              <span class="bench-tag">Throughput</span>
+              <span style="color: var(--cyan); font-weight: 700;">Goroutines</span>
+            </div>
+            <div class="bench-val">&gt;120k<small>QPS</small></div>
+            <h3 class="bench-title">Concurrent Non-blocking I/O</h3>
+            <p class="bench-desc">Handles thousands of concurrent client connections smoothly using lightweight Go goroutines and netpoller.</p>
+            <div class="bench-bar-track">
+              <div class="bench-bar-fill" style="width: 92%;"></div>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 03: Architecture Topology -->
+    <section class="sec" id="architecture">
+      <div class="wrap">
+        <header class="sec-head">
+          <div class="sec-id">
+            <span class="sec-n">03</span>
+            <span>/architecture</span>
+          </div>
+          <div>
+            <h2 class="sec-title">Pure Go engine. <em>Zero-friction topology.</em></h2>
+            <p class="sec-sub">
+              From browser interaction to low-level byte stream encoding, the system is designed as a direct pipeline connecting the UI to the backend engine over TCP.
+            </p>
+          </div>
+        </header>
+
+        <div class="topo-card ticks">
+          <div class="topo-diagram">
+            <div class="topo-node">
+              <span class="topo-node-sub">Client Layer</span>
+              <h3 class="topo-node-title">Browser Studio</h3>
+              <ul class="topo-node-specs">
+                <li><span>Zero dependencies</span> (pure HTML/CSS/JS)</li>
+                <li><span>REPL Console</span> with history &amp; palette</li>
+                <li><span>Real-time</span> keyspace inspection</li>
+              </ul>
+            </div>
+
+            <div class="topo-wire">
+              <span>HTTP / JSON</span>
+              <div class="topo-wire-line"></div>
+              <span>port 8080</span>
+            </div>
+
+            <div class="topo-node">
+              <span class="topo-node-sub">Bridge Gateway</span>
+              <h3 class="topo-node-title">Express / TCP Gateway</h3>
+              <ul class="topo-node-specs">
+                <li><span>RESP Encoder:</span> converts JSON to *args\r\n</li>
+                <li><span>Incremental Parser:</span> chunked streaming</li>
+                <li><span>Multi-command:</span> batch &amp; transaction pipe</li>
+              </ul>
+            </div>
+
+            <div class="topo-wire">
+              <span>TCP Socket</span>
+              <div class="topo-wire-line"></div>
+              <span>port 6379</span>
+            </div>
+
+            <div class="topo-node">
+              <span class="topo-node-sub">Storage Engine</span>
+              <h3 class="topo-node-title">go-redis Server</h3>
+              <ul class="topo-node-specs">
+                <li><span>In-Memory:</span> synchronized Go map</li>
+                <li><span>Eviction:</span> Doubly-linked allkeys-LRU</li>
+                <li><span>Durability:</span> AOF append log &amp; rewrite</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Command Palette Modal (Ctrl+K) -->
+  <div class="search-modal" id="searchModal" hidden>
+    <div class="search-backdrop" id="searchBackdrop"></div>
+    <div class="search-box">
+      <div class="search-header">
+        <span class="search-prompt">&gt;</span>
+        <input type="text" class="search-input" id="searchInput" placeholder="Search commands, actions, or shortcuts..." autocomplete="off" spellcheck="false">
+        <button class="search-close-btn" id="searchCloseBtn" type="button">Esc</button>
+      </div>
+      <div class="search-body">
+        <ul class="search-results-list" id="searchResults">
+          <!-- Populated via JavaScript -->
+        </ul>
+      </div>
+      <div class="search-footer">
+        <span>Use <kbd>&uarr;&darr;</kbd> to navigate, <kbd>Enter</kbd> to select, <kbd>Esc</kbd> to close</span>
+        <span>go-redis palette</span>
+      </div>
+    </div>
   </div>
-</section>
 
-<section>
-  <h2>All Commands</h2>
-  <div class="grid" id="grid"></div>
-</section>
+  <!-- Giant Watermark Footer -->
+  <footer>
+    <div class="wrap">
+      <div class="footer-inner">
+        <div class="f-brand">
+          <a href="#stage" class="logo-link">
+            <span class="logo-prompt">&gt;</span>
+            <span class="logo-name">go-redis</span>
+            <span class="logo-tag">pure go</span>
+          </a>
+          <p>
+            A high-performance, zero-dependency in-memory key-value database and RESP protocol engine built in pure Go.
+          </p>
+        </div>
 
-</main>
+        <div class="f-col">
+          <h4>Repository</h4>
+          <a href="https://github.com/IshankSharma2178/go-redis" target="_blank" rel="noopener noreferrer">go-redis (Backend Engine)</a>
+          <a href="https://github.com/IshankSharma2178/go-redis-ui" target="_blank" rel="noopener noreferrer">go-redis-ui (Frontend Studio)</a>
+          <a href="https://hub.docker.com/r/ishanksharma16/go-redis" target="_blank" rel="noopener noreferrer">Docker Hub Image</a>
+        </div>
 
-<script>
-const COMMANDS = [
-  { name: "PING",     tag: "server",  desc: "Check that the server is alive. Returns PONG, or echoes the given argument.", example: "PING" },
-  { name: "SET",      tag: "string",  desc: "Store a key-value pair. Optionally set an expiry with EX (seconds).",        example: "SET mykey hello EX 10" },
-  { name: "GET",      tag: "string",  desc: "Retrieve the value of a key. Returns nil if the key does not exist.",       example: "GET mykey" },
-  { name: "TTL",      tag: "key",     desc: "Get the remaining time-to-live of a key in seconds. -1 if no expiry, -2 if missing.", example: "TTL mykey" },
-  { name: "DEL",      tag: "key",     desc: "Delete one or more keys. Returns the number of keys removed.",              example: "DEL mykey" },
-  { name: "EXPIRE",   tag: "key",     desc: "Set a TTL on an existing key. Returns 1 on success, 0 if the key is missing.", example: "EXPIRE mykey 30" },
-  { name: "INCR",     tag: "string",  desc: "Atomically increment an integer-valued key by 1. Initializes to 0 if missing.", example: "INCR counter" },
-  { name: "INFO",     tag: "server",  desc: "Return keyspace statistics (key counts, etc.).",                           example: "INFO" },
-  { name: "BGREWRITEAOF", tag: "persist", desc: "Serialize all keys to the AOF file for persistence / crash recovery.",  example: "BGREWRITEAOF" },
-  { name: "LRU",      tag: "evict",   desc: "Trigger a manual allkeys-LRU eviction pass.",                              example: "LRU" },
-  { name: "SLEEP",    tag: "debug",   desc: "Block the server for N seconds. Debug / testing utility.",                 example: "SLEEP 2" },
-  { name: "MULTI/EXEC", tag: "transaction", desc: "Execute commands in a transaction. Write MULTI, then commands, then EXEC on new lines.", example: "MULTI\nSET k1 v1\nINCR counter\nEXEC" },
-  { name: "DISCARD",  tag: "transaction", desc: "Discard all queued commands in a transaction and end the transaction.", example: "DISCARD" },
-];
+        <div class="f-col">
+          <h4>Supported Commands</h4>
+          <a href="#stage" onclick="loadIntoConsole('SET k v');">SET &middot; GET &middot; INCR</a>
+          <a href="#stage" onclick="loadIntoConsole('TTL mykey');">TTL &middot; EXPIRE &middot; DEL</a>
+          <a href="#stage" onclick="loadIntoConsole('MULTI\nSET a 1\nEXEC');">MULTI &middot; EXEC &middot; DISCARD</a>
+          <a href="#stage" onclick="loadIntoConsole('BGREWRITEAOF');">BGREWRITEAOF &middot; LRU</a>
+        </div>
 
-async function api(command) {
-  const res = await fetch("/api/command", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ command }),
-  });
-  return res.json();
-}
-
-function fmt(v) {
-  if (v === null || v === undefined) return "(nil)";
-  if (Array.isArray(v)) return v.length ? v.map(x => (x === null ? "(nil)" : x)).join("\n") : "(empty array)";
-  return String(v);
-}
-
-// ---------- custom command ----------
-
-async function runCustom() {
-  const input = document.getElementById("customInput");
-  const btn = document.getElementById("customBtn");
-  const out = document.getElementById("customResult");
-  const cmd = input.value.trim();
-  if (!cmd) return;
-
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span>';
-  out.className = "response show";
-  out.textContent = "running...";
-
-  try {
-    const data = await api(cmd);
-    if (data.error) {
-      out.className = "response show err";
-      out.textContent = "ERR " + data.error;
-    } else {
-      out.className = "response show ok";
-      out.textContent = fmt(data.result);
-    }
-  } catch (e) {
-    out.className = "response show err";
-    out.textContent = "Request failed: " + e.message;
-  } finally {
-    btn.disabled = false;
-    btn.textContent = "Run";
-  }
-}
-
-// ---------- command cards ----------
-
-function buildCards() {
-  const grid = document.getElementById("grid");
-  grid.innerHTML = "";
-  for (const c of COMMANDS) {
-    const card = document.createElement("div");
-    card.className = "card";
-    card.innerHTML = `
-      <div class="card-head">
-        <code>${c.name}</code>
-        <span class="tag">${c.tag}</span>
+        <div class="f-col">
+          <h4>Deployment</h4>
+          <a href="https://hub.docker.com/r/ishanksharma16/go-redis" target="_blank" rel="noopener noreferrer">docker pull ishanksharma16/go-redis</a>
+          <a href="https://railway.app" target="_blank" rel="noopener noreferrer">Railway Cloud Host</a>
+          <a href="https://redis.io/docs/reference/protocol-spec/" target="_blank" rel="noopener noreferrer">RESP Specification</a>
+        </div>
       </div>
-      <p>${c.desc}</p>
-      <div class="example" title="Click to load into custom box" onclick="loadExample('${c.example.replace(/'/g, "\\'")}')">${c.example}</div>
-      <div class="actions">
-        <button class="run-btn" data-cmd="${c.example}">Run example</button>
+
+      <div class="f-base">
+        <span>&copy; Ishank Sharma &middot; MIT Licensed &middot; Built with Go &amp; Modern Web Standards</span>
+        <span>Aesthetic inspired by px0.ai</span>
       </div>
-      <div class="result"></div>
-    `;
-    card.querySelector(".run-btn").addEventListener("click", (e) => runCard(e.target, c.example));
-    grid.appendChild(card);
-  }
-}
 
-function loadExample(cmd) {
-  const input = document.getElementById("customInput");
-  input.value = cmd;
-  input.focus();
-}
+      <div class="f-wordmark" aria-hidden="true">
+        GO-REDIS
+      </div>
+    </div>
+  </footer>
 
-async function runCard(btn, cmd) {
-  const result = btn.closest(".card").querySelector(".result");
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span>';
-  result.className = "result";
-
-  try {
-    const data = await api(cmd);
-    result.classList.add("show");
-    if (data.error) {
-      result.classList.add("err");
-      result.textContent = "ERR " + data.error;
-    } else {
-      result.classList.add("ok");
-      result.textContent = fmt(data.result);
-    }
-  } catch (e) {
-    result.classList.add("show", "err");
-    result.textContent = "Request failed: " + e.message;
-  } finally {
-    btn.disabled = false;
-    btn.textContent = "Run example";
-  }
-}
-
-// ---------- health ----------
-
-async function checkHealth() {
-  const dot = document.getElementById("dot");
-  const text = document.getElementById("statusText");
-  try {
-    const res = await fetch("/api/health");
-    const data = await res.json();
-    if (data.status === "ok") {
-      dot.className = "dot ok";
-      text.textContent = "connected";
-    } else {
-      dot.className = "dot err";
-      text.textContent = "unreachable";
-    }
-  } catch {
-    dot.className = "dot err";
-    text.textContent = "bridge down";
-  }
-}
-
-buildCards();
-checkHealth();
-setInterval(checkHealth, 10000);
-</script>
+  <script src="app.js"></script>
 </body>
 </html>

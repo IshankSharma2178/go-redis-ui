@@ -6,7 +6,7 @@ const path = require("path");
 const HOST = process.env.REDIS_HOST || "iriguchi.proxy.rlwy.net";
 const PORT = parseInt(process.env.REDIS_PORT || "55254", 10);
 const HTTP_PORT = parseInt(process.env.HTTP_PORT || "8080", 10);
-const TIMEOUT_MS = parseInt(process.env.REDIS_TIMEOUT || "5000", 10);
+const TIMEOUT_MS = parseInt(process.env.REDIS_TIMEOUT || "3000", 10);
 
 // ---------- RESP encoder ----------
 
